@@ -1,0 +1,25 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define WIFI_SSID "Sandemoo"
+#define WIFI_PASSWORD "88888888"
+
+// PIN CONFIG
+#define BUZZER_PIN 16
+#define RX_AUDIO_PIN -1
+#define TX_AUDIO_PIN 2
+#define RELAY1_PIN 15
+#define RELAY2_PIN 13 // JIKA INGIN MENAMBAHKAN RELAY, EDIT DISINI, ALARMMANAGER.CPP, RELAY.CPP, RELAY.H
+
+// DEFAULT VALUES
+#define DEFAULT_VOLUME 10
+#define DEFAULT_EQ 0
+#define TIMEZONE_OFFSET 25200 // UTC+7
+#define DAYLIGHT_OFFSET 0
+#define SYNC_INTERVAL 3600000 // 1 hour
+#define NTP_SERVER1 "pool.ntp.org"
+#define NTP_SERVER2 "time.nist.gov"
+#define DEFAULT_RELAY_STATE LOW
+#define NUMBER_OF_RELAY 2
+
+#endif
