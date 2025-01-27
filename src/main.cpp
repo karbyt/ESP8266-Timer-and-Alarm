@@ -4,6 +4,7 @@
 #include "Storage.h"
 #include "WebServer.h"
 #include "TimeManager.h"
+#include "TimerManager.h"
 #include "AlarmManager.h"
 #include "NTPClient.h"
 #include "Relay.h"
@@ -25,11 +26,12 @@ void setup()
     alarmManager.init(&timeManager);
     webserver.init();
     relay.init();
+    timerManager.init();
 }
 
 void loop()
 {
     timeManager.update();
     alarmManager.checkAlarms();
-
+    timerManager.update();
 }

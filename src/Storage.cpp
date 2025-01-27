@@ -41,7 +41,7 @@ void Storage::init()
         Serial.println("Default audio.json created.");
     }
     if (!LittleFS.exists("/songs.json"))
-    { 
+    {
         Serial.println("songs.json not found. Creating default...");
         String defaultSong = "{}";
         writeJSON("/songs.json", defaultSong);
@@ -60,6 +60,20 @@ void Storage::init()
         String defaultRelay = "{\"relay1\":\"off\",\"relay2\":\"off\"}";
         writeJSON("/relay.json", defaultRelay);
         Serial.println("Default relay.json created.");
+    }
+    if (!LittleFS.exists("/timer.json"))
+    {
+        Serial.println("timer.json not found. Creating default...");
+        String defaultTimer = "{}";
+        writeJSON("/timer.json", defaultTimer);
+        Serial.println("Default timer.json created.");
+    }
+    if (!LittleFS.exists("/timerstate.json"))
+    {
+        Serial.println("timerstate.json not found. Creating default...");
+        String defaultTimerState = "{}";
+        writeJSON("/timerstate.json", defaultTimerState);
+        Serial.println("Default timerstate.json created.");
     }
 }
 

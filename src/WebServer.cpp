@@ -2,6 +2,11 @@
 #include "TimeManager.h"
 #include "WebPage.h"
 #include "Relay.h"
+#include "TimerManager.h"
+#include "Audio.h"
+#include "Buzzer.h"
+#include "AlarmManager.h"
+
 
 AsyncWebServer server(80);
 
@@ -179,18 +184,56 @@ void handleCommand(AsyncWebServerRequest *request)
     }
     else if (command.startsWith("relay") && !valueStr.isEmpty())
     {
-      // Mendapatkan nomor relay (misalnya relay1 atau relay2)
-      byte relayNumber = (command == "relay1") ? 1 : (command == "relay2") ? 2
-                                                                           : 0;
+      // Mendapatkan nomor relay (relay1, relay2, relay3, relay4 atau semua relay jika relay0)
+      byte relayNumber = 0;
 
-      if (relayNumber == 0)
+      if (command == "relay1")
+        relayNumber = 1;
+      else if (command == "relay2")
+        relayNumber = 2;
+      else if (command == "relay3")
+        relayNumber = 3;
+      else if (command == "relay4")
+        relayNumber = 4;
+
+      if (relayNumber == 0 && (valueStr == "on" || valueStr == "1"))
       {
-        json["error"] = "Invalid relay number.";
-        Serial.println("Invalid relay number");
+        // Menghidupkan semua relay
+        for (byte i = 1; i <= 4; i++)
+        {
+          relay.on(i);
+          json["relay" + String(i)] = "on";
+        }
+        Serial.println("All relays turned ON");
+      }
+      else if (relayNumber == 0 && (valueStr == "off" || valueStr == "0"))
+      {
+        // Mematikan semua relay
+        for (byte i = 1; i <= 4; i++)
+        {
+          relay.off(i);
+          json["relay" + String(i)] = "off";
+        }
+        Serial.println("All relays turned OFF");
+      }
+      else if (relayNumber == 0 && (valueStr == "toggle" || valueStr == "2"))
+      {
+        // Toggle semua relay
+        for (byte i = 1; i <= 4; i++)
+        {
+          relay.toggle(i);
+          json["relay" + String(i)] = "toggled";
+        }
+        Serial.println("All relays toggled");
+      }
+      else if (relayNumber == 0)
+      {
+        json["error"] = "Invalid command for all relays.";
+        Serial.println("Invalid command for all relays");
       }
       else
       {
-        // Menangani perintah on, off, toggle, 0, 1, 2
+        // Menangani perintah untuk relay individu
         if (valueStr == "on" || valueStr == "1")
         {
           // Menghidupkan relay
@@ -218,6 +261,22 @@ void handleCommand(AsyncWebServerRequest *request)
           Serial.println("Invalid command for relay " + String(relayNumber));
         }
       }
+    }
+    else if (command == "timerstart")
+    {
+      json["timerstart"] = true;
+      request->send(200, "application/json", "{\"timerstart\":true}");
+      Serial.println("starting timer");
+      timerManager.start();
+      return;
+    }
+    else if (command == "timerstop")
+    {
+      json["timerstop"] = true;
+      request->send(200, "application/json", "{\"timerstop\":true}");
+      Serial.println("timer stopped");
+      timerManager.stop();
+      return;
     }
 
     else
@@ -275,6 +334,114 @@ void Webserver::setupServerRoutes()
     String json = storage.readJSON("/songs.json"); // Gunakan storage untuk memanggil readJSON
     request->send(200, "application/json", json); });
 
+  server.on("/api/timer", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+    String json = storage.readJSON("/timer.json"); // Gunakan storage untuk memanggil readJSON
+    request->send(200, "application/json", json); });
+
+  server.on("/api/timer", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+            {
+    static String body = "";
+    body += String((char *)data).substring(0, len);
+
+    if (index + len == total) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        if (error) {
+            request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+            return;
+        }
+        
+        // Tambahkan validasi untuk id
+        if (!doc.containsKey("id")) {
+            request->send(400, "application/json", "{\"error\":\"Timer ID is required\"}");
+            return;
+        }
+
+        int id = doc["id"] | 0;
+        unsigned long onTime = doc["on_time"] | 0;
+        unsigned long offTime = doc["off_time"] | 0;
+        int cycleCount = doc["cycle"] | 0;
+        bool reversed = doc["reversed"] | false;
+
+        // Validasi ID
+        if (id < 1 || id > 4) {
+            request->send(400, "application/json", "{\"error\":\"Invalid timer ID (must be 1-4)\"}");
+            return;
+        }
+        
+        bool success = timerManager.addTimer(id, onTime, offTime, cycleCount, reversed);
+        
+        if (success) {
+            String response = "{\"message\":\"Timer added successfully to relay " + String(id) + "\"}";
+            request->send(201, "application/json", response);
+        } else {
+            String response = "{\"error\":\"Timer ID " + String(id) + " is already in use\"}";
+            request->send(400, "application/json", response);
+        }
+
+        body = "";
+    } });
+
+  // PUT - Update existing timer
+  server.on("/api/timer", HTTP_PUT, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+            {
+    static String body = "";
+    body += String((char *)data).substring(0, len);
+
+    if (index + len == total) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        if (error) {
+            request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+            return;
+        }
+        
+        if (!doc["id"].is<int>()) {
+            request->send(400, "application/json", "{\"error\":\"Timer ID is required\"}");
+            return;
+        }
+        
+        int id = doc["id"];
+        unsigned long onTime = doc["on_time"] | 0;
+        unsigned long offTime = doc["off_time"] | 0;
+        int cycleCount = doc["cycle"] | 0;
+        bool reversed = doc["reversed"] | false;
+        
+        bool success = timerManager.updateTimer(id, onTime, offTime, cycleCount, reversed);
+        
+        if (success) {
+            request->send(200, "application/json", "{\"message\":\"Timer updated successfully\"}");
+        } else {
+            request->send(404, "application/json", "{\"error\":\"Timer not found\"}");
+        }
+
+        body = "";
+    } });
+
+  // DELETE - Remove timer
+  server.on("/api/timer", HTTP_DELETE, [](AsyncWebServerRequest *request)
+            {
+    if (request->hasParam("id")) {
+        int id = request->getParam("id")->value().toInt();
+        bool success = timerManager.deleteTimer(id);
+        
+        if (success) {
+            request->send(200, "application/json", "{\"message\":\"Timer deleted successfully\"}");
+        } else {
+            request->send(404, "application/json", "{\"error\":\"Timer not found\"}");
+        }
+    } else {
+        request->send(400, "application/json", "{\"error\":\"Timer ID is required\"}");
+    } });
+
+  server.on("/api/timerstate", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+    String json = storage.readJSON("/timerstate.json"); // Gunakan storage untuk memanggil readJSON
+    request->send(200, "application/json", json); });
+
   server.on("/api/alarm", HTTP_GET, [](AsyncWebServerRequest *request)
             {
     String json = storage.readJSON("/alarm.json"); // Gunakan storage untuk memanggil readJSON
@@ -315,6 +482,59 @@ void Webserver::setupServerRoutes()
         // Reset body for next request
         body = "";
     } });
+  
+  //==================TESTING==================
+  server.on("/api/writealarm", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+{
+    static String body = ""; // Static variable to accumulate data
+    body += String((char *)data).substring(0, len);
+
+    // If all data has been received
+    if (index + len == total) {
+        // Parse JSON Array
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, body);
+        
+        if (error) {
+            request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+            Serial.println("JSON parsing failed");
+            body = "";
+            return;
+        }
+
+        // Process each alarm in the array
+        JsonArray alarms = doc.as<JsonArray>();
+        int count = 0;
+        
+        for (JsonVariant alarm : alarms) {
+            // Extract alarm details
+            String label = alarm["label"].as<String>();
+            String time = alarm["time"].as<String>();
+            String days = alarm["days"].as<String>();
+            int ringtone = alarm["ringtone"].as<int>();
+            String relay = alarm["relay"].as<String>();
+            int relayDuration = alarm["relay_duration"].as<int>();
+            
+            // Remove existing alarm if id exists
+            if (alarm.containsKey("id")) {
+                int id = alarm["id"].as<int>();
+                alarmManager.removeAlarm(id);
+            }
+            
+            // Add new alarm
+            alarmManager.addAlarm(label, time, days, ringtone, relay, relayDuration);
+            count++;
+        }
+        
+        // Send response
+        String response = "{\"message\":\"Alarms updated successfully\",\"updated_count\":" + String(count) + "}";
+        request->send(200, "application/json", response);
+        
+
+        // Reset body for next request
+        body = "";
+    }
+});
 
   // UPDATE ALRM PUT
   server.on("/api/alarm", HTTP_PUT, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)

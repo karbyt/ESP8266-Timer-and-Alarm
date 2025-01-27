@@ -2,6 +2,7 @@
 #include "WifiManager.h"
 #include "Config.h"
 
+
 WifiManager wifiManager;
 
 void WifiManager::init(){

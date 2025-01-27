@@ -57,7 +57,7 @@ void Relay::on(byte relayNumber)
         return;
     }
     byte pin = relayPins[relayNumber - 1];
-    digitalWrite(pin, LOW);
+    digitalWrite(pin, RELAY_ON);
     buzzer.beep(1);
     storage.updateJSON("relay.json", relayKey, "on");
     Serial.println("Relay" + String(relayNumber) + " turned ON");
@@ -73,7 +73,7 @@ void Relay::off(byte relayNumber)
         return;
     }
     byte pin = relayPins[relayNumber - 1];
-    digitalWrite(pin, HIGH);
+    digitalWrite(pin, RELAY_OFF);
     buzzer.beep(1);
     storage.updateJSON("relay.json", relayKey, "off");
     Serial.println("Relay" + String(relayNumber) + " turned OFF");
@@ -91,7 +91,7 @@ void Relay::toggle(byte relayNumber)
     String currentState = getRelayState(relayNumber);
     String newState = (currentState == "on") ? "off" : "on";
     byte pin = relayPins[relayNumber - 1];
-    digitalWrite(pin, (newState == "on") ? LOW : HIGH);
+    digitalWrite(pin, (newState == "on") ? RELAY_ON : RELAY_OFF);
     buzzer.beep(1);
     storage.updateJSON("relay.json", relayKey, newState);
 }

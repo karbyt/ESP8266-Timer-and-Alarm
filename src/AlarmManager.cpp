@@ -45,6 +45,8 @@ void AlarmManager::checkAlarms()
 
             // Pastikan `days` diubah ke integer jika itu string
             String daysStr = alarmJson["days"].as<String>();
+            // Balikkan string `days` agar sesuai dengan format bitmask
+            std::reverse(daysStr.begin(), daysStr.end());
             int days = strtol(daysStr.c_str(), nullptr, 2); // Konversi dari string biner ke integer
 
             // Periksa apakah alarm aktif pada hari ini
@@ -72,8 +74,8 @@ void AlarmManager::checkAlarms()
                 // Trigger the alarm
                 buzzer.beep(1);
                 audio.play(ringtone);
-                
-                Serial.println("Alarm triggered");
+
+                Serial.println("========ALARM TRIGGERED=========");
 
                 alarmTriggeredThisMinute = true; // Mencegah retrigger dalam menit yang sama
                 break;
@@ -81,7 +83,6 @@ void AlarmManager::checkAlarms()
         }
     }
 }
-
 
 void AlarmManager::addAlarm(const String &label, const String &time, String days, int ringtone, const String &relay, int relayDuration)
 {
@@ -122,7 +123,7 @@ void AlarmManager::addAlarm(const String &label, const String &time, String days
     String updatedJson;
     serializeJsonPretty(doc, updatedJson);
     storage.writeJSON("/alarm.json", updatedJson);
-    Serial.println("Alarm added successfully teko alarmmanager"+updatedJson);
+    Serial.println("Alarm added successfully teko alarmmanager" + updatedJson);
 }
 
 void AlarmManager::removeAlarm(int id)
