@@ -45,7 +45,7 @@ void TimerManager::saveConfig()
     {
         if (relayConfigs[i].cycle != 0 || relayConfigs[i].cycle == -1)
         {
-            JsonObject timer = array.createNestedObject();
+            JsonObject timer = array.add<JsonObject>();
             timer["id"] = relayConfigs[i].id;
             timer["on_time"] = relayConfigs[i].on_time;
             timer["off_time"] = relayConfigs[i].off_time;

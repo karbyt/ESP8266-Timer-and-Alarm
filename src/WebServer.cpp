@@ -377,7 +377,7 @@ void Webserver::setupServerRoutes()
         }
         
         // Tambahkan validasi untuk id
-        if (!doc.containsKey("id")) {
+        if (!doc["id"].is<int>()) {
             request->send(400, "application/json", "{\"error\":\"Timer ID is required\"}");
             return;
         }

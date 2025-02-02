@@ -14,7 +14,7 @@ void AlarmManager::processRelayString(const String& relayStr) {
     // relayStr = "1:1000,0:0,1:2000,1:3000"
     Serial.println("Processing relay string: " + relayStr);
     
-    int index = 0;
+    unsigned int index = 0;
     int relayIndex = 1; // Track which relay number we're processing
     
     while (index < relayStr.length()) {
@@ -158,7 +158,7 @@ void AlarmManager::addAlarm(const String &label, const String &time, String days
         }
     }
 
-    JsonObject newAlarm = alarms.createNestedObject();
+    JsonObject newAlarm = alarms.add<JsonObject>();
     newAlarm["id"] = nextId;
     newAlarm["label"] = label;
     newAlarm["time"] = time;

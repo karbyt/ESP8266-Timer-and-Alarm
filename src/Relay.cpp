@@ -19,7 +19,7 @@ String Relay::getRelayState(byte relayNumber)
         return "off"; // Nilai default jika JSON rusak atau kosong
     }
     String relayKey = "relay" + String(relayNumber);
-    if (doc.containsKey(relayKey))
+    if (doc[relayKey].is<int>())
     {
         return doc[relayKey].as<String>(); // Mengembalikan status dari key tersebut
     }

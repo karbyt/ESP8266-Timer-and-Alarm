@@ -29,21 +29,19 @@ int calculateYear(unsigned long &epoch) {
 
 // Menghitung bulan dari epoch
 int calculateMonth(unsigned long &epoch, int year) {
-    // Jumlah hari per bulan untuk tahun biasa
     int daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-    // Periksa apakah tahun kabisat
     if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) {
-        daysInMonth[1] = 29;  // Februari memiliki 29 hari
+        daysInMonth[1] = 29;
     }
 
     int month = 0;
-    while (epoch >= daysInMonth[month] * 86400) {  // Konversi hari ke detik
-        epoch -= daysInMonth[month] * 86400;
+    while (epoch >= (unsigned long)daysInMonth[month] * 86400) {  // Konversi ke unsigned long
+        epoch -= (unsigned long)daysInMonth[month] * 86400;
         month++;
     }
 
-    return month + 1;  // Bulan dimulai dari 1
+    return month + 1;
 }
 
 // Menghitung hari dari epoch
