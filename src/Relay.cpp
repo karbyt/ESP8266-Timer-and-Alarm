@@ -33,18 +33,28 @@ void Relay::init()
 {
     String relay1State = getRelayState(1); // Membaca status relay1
     String relay2State = getRelayState(2); // Membaca status relay2
+    String relay3State = getRelayState(3); // Membaca status relay2
+    String relay4State = getRelayState(4); // Membaca status relay2
 
     // Mengonversi status string menjadi HIGH atau LOW
-    int relay1StateValue = (relay1State == "on") ? LOW : HIGH;
-    int relay2StateValue = (relay2State == "on") ? LOW : HIGH;
+    int relay1StateValue = (relay1State == "on") ? RELAY_ON : RELAY_OFF;
+    int relay2StateValue = (relay2State == "on") ? RELAY_ON : RELAY_OFF;
+    int relay3StateValue = (relay3State == "on") ? RELAY_ON : RELAY_OFF;
+    int relay4StateValue = (relay4State == "on") ? RELAY_ON : RELAY_OFF;
 
     pinMode(RELAY1_PIN, OUTPUT);
     pinMode(RELAY2_PIN, OUTPUT);
+    pinMode(RELAY3_PIN, OUTPUT);
+    pinMode(RELAY4_PIN, OUTPUT);
 
     digitalWrite(RELAY1_PIN, relay1StateValue);
-    Serial.println("relay1 init: " + relay1State);
+    Serial.println("relay.cpp relay1 init: " + relay1State);
     digitalWrite(RELAY2_PIN, relay2StateValue);
-    Serial.println("relay2 init: " + relay2State);
+    Serial.println("relay.cpp relay2 init: " + relay2State);
+    digitalWrite(RELAY3_PIN, relay3StateValue);
+    Serial.println("relay.cpp relay3 init: " + relay2State);
+    digitalWrite(RELAY4_PIN, relay4StateValue);
+    Serial.println("relay.cpp relay4 init: " + relay2State);
 }
 
 void Relay::on(byte relayNumber)

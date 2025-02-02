@@ -9,16 +9,6 @@
 #include <LittleFS.h>
 #include "Storage.h"
 
-class Logger
-{
-public:
-    void init(AsyncWebServer &server);
-    void addLog(const String &log);
-
-private:
-    String logBuffer;
-    const size_t maxLogSize = 1024;
-};
 
 class Webserver
 {
@@ -32,4 +22,3 @@ private:
 #endif
 
 extern Webserver webserver;
-extern Logger logger;

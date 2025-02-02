@@ -7,10 +7,8 @@
 #include "Buzzer.h"
 #include "AlarmManager.h"
 
-
 AsyncWebServer server(80);
 
-Logger logger;
 Webserver webserver;
 
 void Webserver::init()
@@ -278,6 +276,31 @@ void handleCommand(AsyncWebServerRequest *request)
       timerManager.stop();
       return;
     }
+    else if (command == "time")
+    {
+      String json = timeManager.getTimeJson();
+      request->send(200, "application/json", json);
+      return;
+    }
+    else if (command == "timer")
+    {
+      String json = storage.readJSON("/timer.json"); // Gunakan storage untuk memanggil readJSON
+      request->send(200, "application/json", json);
+      return;
+    }
+    else if (command == "alarm")
+    {
+      String json = storage.readJSON("/alarm.json"); // Gunakan storage untuk memanggil readJSON
+      request->send(200, "application/json", json);
+      return;
+    }
+    else if (command == "info")
+    {
+      uint32_t freeHeap = ESP.getFreeHeap();
+      String response = "{\"free_heap\":" + String(freeHeap) + "}";
+      request->send(200, "application/json", response);
+      return;
+    }
 
     else
     {
@@ -298,7 +321,7 @@ void Webserver::setupServerRoutes()
 {
   DefaultHeaders::Instance().addHeader("Permissions-Policy", "interest-cohort=(), browsing-topics=(), private-state-token-redemption=(), private-state-token-issuance=()");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
 
   server.onNotFound([](AsyncWebServerRequest *request)
@@ -308,7 +331,7 @@ void Webserver::setupServerRoutes()
     } else {
         // Check if the path is one of our frontend routes
         String path = request->url();
-        if (path == "/" || path == "/cs" || path == "/st" || path == "/ad" || path == "/dp") {
+        if (path == "/" || path == "/cs" || path == "/st" || path == "/ad" || path == "/tm") {
             request->send_P(200, "text/html", htmlContent);
         } else {
             // Send 404 page
@@ -470,10 +493,9 @@ void Webserver::setupServerRoutes()
         String days = doc["days"].as<String>();
         int ringtone = doc["ringtone"].as<int>();
         String relay = doc["relay"].as<String>();
-        int relayDuration = doc["relay_duration"].as<int>();
         
         // Add alarm
-        alarmManager.addAlarm(label, time, days, ringtone, relay, relayDuration);
+        alarmManager.addAlarm(label, time, days, ringtone, relay);
         
         // Send success response
         request->send(201, "application/json", "{\"message\":\"Alarm added successfully\"}");
@@ -482,59 +504,25 @@ void Webserver::setupServerRoutes()
         // Reset body for next request
         body = "";
     } });
-  
+
   //==================TESTING==================
   server.on("/api/writealarm", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
-{
+            {
     static String body = ""; // Static variable to accumulate data
     body += String((char *)data).substring(0, len);
 
     // If all data has been received
     if (index + len == total) {
-        // Parse JSON Array
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, body);
-        
-        if (error) {
-            request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-            Serial.println("JSON parsing failed");
-            body = "";
-            return;
-        }
+        // Write the raw data directly to alarm.json
+        storage.writeJSON("/alarm.json", body); // Write raw data to file
 
-        // Process each alarm in the array
-        JsonArray alarms = doc.as<JsonArray>();
-        int count = 0;
-        
-        for (JsonVariant alarm : alarms) {
-            // Extract alarm details
-            String label = alarm["label"].as<String>();
-            String time = alarm["time"].as<String>();
-            String days = alarm["days"].as<String>();
-            int ringtone = alarm["ringtone"].as<int>();
-            String relay = alarm["relay"].as<String>();
-            int relayDuration = alarm["relay_duration"].as<int>();
-            
-            // Remove existing alarm if id exists
-            if (alarm.containsKey("id")) {
-                int id = alarm["id"].as<int>();
-                alarmManager.removeAlarm(id);
-            }
-            
-            // Add new alarm
-            alarmManager.addAlarm(label, time, days, ringtone, relay, relayDuration);
-            count++;
-        }
-        
         // Send response
-        String response = "{\"message\":\"Alarms updated successfully\",\"updated_count\":" + String(count) + "}";
+        String response = "{\"message\":\"Alarms updated successfully\"}";
         request->send(200, "application/json", response);
-        
 
         // Reset body for next request
         body = "";
-    }
-});
+    } });
 
   // UPDATE ALRM PUT
   server.on("/api/alarm", HTTP_PUT, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
@@ -565,10 +553,9 @@ void Webserver::setupServerRoutes()
         String days = doc["days"].as<String>();
         int ringtone = doc["ringtone"].as<int>();
         String relay = doc["relay"].as<String>();
-        int relayDuration = doc["relay_duration"].as<int>();
 
         // Try to update the alarm
-        bool updated = alarmManager.updateAlarm(id, label, time, days, ringtone, relay, relayDuration);
+        bool updated = alarmManager.updateAlarm(id, label, time, days, ringtone, relay);
         if (updated) {
             request->send(200, "application/json", "{\"message\":\"Alarm updated successfully\"}");
         } else {
@@ -629,6 +616,12 @@ void Webserver::setupServerRoutes()
             {
     String json = storage.readJSON("/relay.json"); // Gunakan storage untuk memanggil readJSON
     request->send(200, "application/json", json); });
+
+  server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+    uint32_t freeHeap = ESP.getFreeHeap();
+    String response = "{\"free_heap\":" + String(freeHeap) + "}";
+    request->send(200, "application/json", response); });
 
   // server.on("/api/deletejson", HTTP_POST, [](AsyncWebServerRequest *request)
   //           {

@@ -11,10 +11,6 @@
 
 extern AsyncWebServer server;
 
-const int led = 2;
-const int hour = 18;
-const int minute = 5;
-
 void setup()
 {
     Serial.begin(115200);
@@ -22,11 +18,10 @@ void setup()
     buzzer.init();
     storage.init();
     wifiManager.init();
-    timeManager.init();
+    timerManager.init();
+    relay.init();
     alarmManager.init(&timeManager);
     webserver.init();
-    relay.init();
-    timerManager.init();
 }
 
 void loop()

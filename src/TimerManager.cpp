@@ -111,7 +111,9 @@ void TimerManager::initializeRelayStates()
     unsigned long currentTime = millis();
     for (int i = 0; i < 4; i++)
     {
-        if (relayConfigs[i].cycle != 0 || relayConfigs[i].cycle == -1)
+        // Only initialize if there's an active timer AND valid times
+        if ((relayConfigs[i].cycle > 0 || relayConfigs[i].cycle == -1) && 
+            (relayConfigs[i].on_time > 0 || relayConfigs[i].off_time > 0))
         {
             if (relayConfigs[i].reversed)
             {
@@ -125,6 +127,12 @@ void TimerManager::initializeRelayStates()
             }
             relayConfigs[i].startTime = currentTime;
         }
+        else
+        {
+            // No active timer or invalid configuration
+            relayState[i] = RELAY_OFF;
+            digitalWrite(relayPins[i], RELAY_OFF);
+        }
     }
 }
 
@@ -134,7 +142,16 @@ void TimerManager::resetConfig()
     for (int i = 0; i < 4; i++)
     {
         relayConfigs[i].cycle = relayConfigs[i].initial_cycle;
-        relayState[i] = relayConfigs[i].reversed ? RELAY_ON : RELAY_OFF;
+        // Hanya aktifkan relay jika timer memiliki konfigurasi valid
+        if ((relayConfigs[i].cycle > 0 || relayConfigs[i].cycle == -1) && 
+            (relayConfigs[i].on_time > 0 || relayConfigs[i].off_time > 0)) {
+            relayState[i] = relayConfigs[i].reversed ? RELAY_OFF : RELAY_ON;
+            digitalWrite(relayPins[i], relayState[i]);
+        } else {
+            // Pastikan relay mati jika tidak ada konfigurasi
+            relayState[i] = RELAY_OFF;
+            digitalWrite(relayPins[i], RELAY_OFF);
+        }
         currentCycle[i] = 0;
         relayConfigs[i].startTime = currentTime;
     }
@@ -158,32 +175,23 @@ void TimerManager::updateRelay(int index)
 
     unsigned long currentTime = millis();
     unsigned long elapsedTime = currentTime - relayConfigs[index].startTime;
-    
-    // Hitung total durasi satu siklus
     unsigned long cycleDuration = relayConfigs[index].on_time + relayConfigs[index].off_time;
-    
-    // Hitung posisi dalam siklus saat ini
     unsigned long timeInCycle = elapsedTime % cycleDuration;
-    
-    // Tentukan apakah seharusnya ON atau OFF
     bool shouldBeOn = timeInCycle < relayConfigs[index].on_time;
     
-    // Terapkan mode reversed jika aktif
     if (relayConfigs[index].reversed) shouldBeOn = !shouldBeOn;
 
-    // Update state relay jika berbeda
     if (relayState[index] != shouldBeOn) {
         relayState[index] = shouldBeOn;
+        // Langsung kontrol pin tanpa menggunakan class Relay
         digitalWrite(relayPins[index], shouldBeOn ? RELAY_ON : RELAY_OFF);
         
-        // Update cycle counter saat transisi ke OFF
         if (!shouldBeOn && relayConfigs[index].cycle > 0) {
             currentCycle[index]++;
             if (currentCycle[index] >= relayConfigs[index].cycle) {
                 relayConfigs[index].cycle = 0;
                 digitalWrite(relayPins[index], RELAY_OFF);
                 
-                // Cek apakah semua timer non-infinite sudah selesai
                 bool allFinished = true;
                 bool hasInfinite = false;
                 
@@ -196,7 +204,6 @@ void TimerManager::updateRelay(int index)
                     }
                 }
                 
-                // Jika semua timer sudah selesai dan tidak ada timer infinite, stop timer
                 if (allFinished && !hasInfinite) {
                     stop();
                 }

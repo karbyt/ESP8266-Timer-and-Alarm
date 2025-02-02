@@ -9,13 +9,78 @@ void AlarmManager::init(TimeManager *timeManager)
     _timeManager = timeManager;
 }
 
-void AlarmManager::checkAlarms()
-{
+void AlarmManager::processRelayString(const String& relayStr) {
+    // Format: "1:1000,0:0,1:2000,1:3000"
+    // relayStr = "1:1000,0:0,1:2000,1:3000"
+    Serial.println("Processing relay string: " + relayStr);
+    
+    int index = 0;
+    int relayIndex = 1; // Track which relay number we're processing
+    
+    while (index < relayStr.length()) {
+        int nextComma = relayStr.indexOf(',', index);
+        if (nextComma == -1) nextComma = relayStr.length();
+        
+        String relayPart = relayStr.substring(index, nextComma);
+        int colonPos = relayPart.indexOf(':');
+        
+        if (colonPos != -1) {
+            byte shouldTurnOn = relayPart.substring(0, colonPos).toInt();
+            unsigned long duration = relayPart.substring(colonPos + 1).toInt();
+            
+            Serial.print("Relay ");
+            Serial.print(relayIndex);
+            Serial.print(" should be: ");
+            Serial.print(shouldTurnOn ? "ON" : "OFF");
+            Serial.print(" for ");
+            Serial.print(duration);
+            Serial.println("ms");
+            
+            if (shouldTurnOn == 1 && duration > 0) {
+                relay.on(relayIndex);
+                RelayTimer timer = {
+                    .relayNumber = (byte)relayIndex,
+                    .startTime = millis(),
+                    .duration = duration
+                };
+                activeRelays.push_back(timer);
+                
+                Serial.print("Added timer for relay ");
+                Serial.println(relayIndex);
+            }
+        }
+        
+        index = nextComma + 1;
+        relayIndex++; // Increment to next relay number
+    }
+}
+
+void AlarmManager::updateRelayTimers() {
+    unsigned long currentTime = millis();
+    
+    for (auto it = activeRelays.begin(); it != activeRelays.end();) {
+        if (currentTime - it->startTime >= it->duration) {
+            Serial.print("Turning off relay ");
+            Serial.print(it->relayNumber);
+            Serial.println(" due to timeout");
+            
+            relay.off(it->relayNumber);
+            it = activeRelays.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void AlarmManager::checkAlarms() {
     if (!_timeManager->isTimeSet())
         return;
 
+    // Update any active relay timers
+    updateRelayTimers();
+
     String alarmsJson = storage.readJSON("/alarm.json");
-    JsonDocument doc; // Pastikan buffer cukup besar
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, alarmsJson);
 
     if (error)
@@ -25,66 +90,48 @@ void AlarmManager::checkAlarms()
 
     int currentHour = _timeManager->getHours();
     int currentMinute = _timeManager->getMinutes();
-    int currentDay = _timeManager->getDay(); // Misalnya, Minggu = 0, Senin = 1, dst.
+    int currentDay = _timeManager->getDay();
 
     static bool alarmTriggeredThisMinute = false;
 
-    // Reset flag setelah detik 0 berlalu
-    if (_timeManager->getSeconds() > 0)
-    {
+    if (_timeManager->getSeconds() > 0) {
         alarmTriggeredThisMinute = false;
     }
 
-    if (!alarmTriggeredThisMinute)
-    {
-        for (JsonVariant alarmJson : alarms)
-        {
+    if (!alarmTriggeredThisMinute) {
+        for (JsonVariant alarmJson : alarms) {
             String timeStr = alarmJson["time"].as<String>();
             int alarmHour = timeStr.substring(0, 2).toInt();
             int alarmMinute = timeStr.substring(3).toInt();
 
-            // Pastikan `days` diubah ke integer jika itu string
             String daysStr = alarmJson["days"].as<String>();
-            // Balikkan string `days` agar sesuai dengan format bitmask
             std::reverse(daysStr.begin(), daysStr.end());
-            int days = strtol(daysStr.c_str(), nullptr, 2); // Konversi dari string biner ke integer
+            int days = strtol(daysStr.c_str(), nullptr, 2);
 
-            // Periksa apakah alarm aktif pada hari ini
             bool isDayActive = (days & (1 << currentDay));
 
             if (currentHour == alarmHour &&
                 currentMinute == alarmMinute &&
                 _timeManager->getSeconds() == 0 &&
-                isDayActive)
-            {
-                // Debug logging
-                Serial.print("Day active check: ");
-                Serial.print("Current day: ");
-                Serial.print(currentDay);
-                Serial.print(", Days value: ");
-                Serial.print(days, BIN); // Cetak dalam format biner untuk debug
-                Serial.print(", Bitwise check: ");
-                Serial.println(isDayActive ? "TRUE" : "FALSE");
+                isDayActive) {
 
-                // Ekstrak parameter alarm
                 int ringtone = alarmJson["ringtone"].as<int>();
-                String relay = alarmJson["relay"].as<String>();
-                int relayDuration = alarmJson["relay_duration"].as<int>();
+                String relayStr = alarmJson["relay"].as<String>();
 
-                // Trigger the alarm
+                // Trigger alarm actions
                 buzzer.beep(1);
                 audio.play(ringtone);
+                processRelayString(relayStr);
 
                 Serial.println("========ALARM TRIGGERED=========");
-
-                alarmTriggeredThisMinute = true; // Mencegah retrigger dalam menit yang sama
+                alarmTriggeredThisMinute = true;
                 break;
             }
         }
     }
 }
 
-void AlarmManager::addAlarm(const String &label, const String &time, String days, int ringtone, const String &relay, int relayDuration)
+void AlarmManager::addAlarm(const String &label, const String &time, String days, int ringtone, const String &relay)
 {
     String alarmsJson = storage.readJSON("/alarm.json");
     JsonDocument doc;
@@ -118,12 +165,10 @@ void AlarmManager::addAlarm(const String &label, const String &time, String days
     newAlarm["days"] = days;
     newAlarm["ringtone"] = ringtone;
     newAlarm["relay"] = relay;
-    newAlarm["relay_duration"] = relayDuration;
 
     String updatedJson;
     serializeJsonPretty(doc, updatedJson);
     storage.writeJSON("/alarm.json", updatedJson);
-    Serial.println("Alarm added successfully teko alarmmanager" + updatedJson);
 }
 
 void AlarmManager::removeAlarm(int id)
@@ -160,7 +205,7 @@ void AlarmManager::removeAlarm(int id)
     storage.writeJSON("/alarm.json", updatedJson);
 }
 
-bool AlarmManager::updateAlarm(int id, String label, String time, String days, int ringtone, String relay, int relayDuration)
+bool AlarmManager::updateAlarm(int id, String label, String time, String days, int ringtone, String relay)
 {
     String alarmsJson = storage.readJSON("/alarm.json");
     JsonDocument doc;
@@ -183,7 +228,6 @@ bool AlarmManager::updateAlarm(int id, String label, String time, String days, i
             alarm["days"] = days; // Store days as string to preserve leading zero
             alarm["ringtone"] = ringtone;
             alarm["relay"] = relay;
-            alarm["relay_duration"] = relayDuration;
 
             // Save the updated alarms back to the file
             String updatedAlarmsJson;
