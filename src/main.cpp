@@ -1,5 +1,6 @@
+#include <Arduino.h>
+#include "WifiSettings.h"
 #include "Buzzer.h"
-#include "WifiManager.h"
 #include "Audio.h"
 #include "Storage.h"
 #include "WebServer.h"
@@ -17,7 +18,7 @@ void setup()
     audio.init();
     buzzer.init();
     storage.init();
-    wifiManager.init();
+    wifiSettings.init();
     timerManager.init();
     relay.init();
     alarmManager.init(&timeManager);
@@ -29,4 +30,6 @@ void loop()
     timeManager.update();
     alarmManager.checkAlarms();
     timerManager.update();
+    relay.update();
+    // wifiSettings.handleClient(); // Add this line to handle WiFi manager clients
 }

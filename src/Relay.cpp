@@ -57,51 +57,148 @@ void Relay::init()
     Serial.println("relay.cpp relay4 init: " + relay2State);
 }
 
-void Relay::on(byte relayNumber)
-{
+void Relay::on(byte relayNumber) {
     String relayKey = "relay" + String(relayNumber);
-    if (relayNumber < 1 || relayNumber > 4)
-    {
+    if (relayNumber < 1 || relayNumber > 4) {
         Serial.println("Invalid relay number");
         buzzer.beep(2);
         return;
     }
+
+    // Read existing JSON
+    String jsonContent = storage.readJSON("relay.json");
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, jsonContent);
+    if (error) {
+        Serial.println("Failed to parse JSON");
+        return;
+    }
+
+    // Update state in nested structure
+    doc[relayKey]["state"] = "on";
+    // Keep existing duration value
+    if (!doc[relayKey]["duration"].is<int>()) {
+        doc[relayKey]["duration"] = 1000; // Default duration if not set
+    }
+
+    // Convert to string and save
+    String updatedJson;
+    serializeJsonPretty(doc, updatedJson);
+    storage.writeJSON("relay.json", updatedJson);
+
+    // Set the pin
     byte pin = relayPins[relayNumber - 1];
     digitalWrite(pin, RELAY_ON);
-    buzzer.beep(1);
-    storage.updateJSON("relay.json", relayKey, "on");
     Serial.println("Relay" + String(relayNumber) + " turned ON");
 }
 
-void Relay::off(byte relayNumber)
-{
+void Relay::off(byte relayNumber) {
     String relayKey = "relay" + String(relayNumber);
-    if (relayNumber < 1 || relayNumber > 4)
-    {
+    if (relayNumber < 1 || relayNumber > 4) {
         Serial.println("Invalid relay number");
         buzzer.beep(2);
         return;
     }
+
+    // Read existing JSON
+    String jsonContent = storage.readJSON("relay.json");
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, jsonContent);
+    if (error) {
+        Serial.println("Failed to parse JSON");
+        return;
+    }
+
+    // Update state in nested structure
+    doc[relayKey]["state"] = "off";
+    // Keep existing duration value
+    if (!doc[relayKey]["duration"].is<int>()) {
+        doc[relayKey]["duration"] = 1000; // Default duration if not set
+    }
+
+    // Convert to string and save
+    String updatedJson;
+    serializeJsonPretty(doc, updatedJson);
+    storage.writeJSON("relay.json", updatedJson);
+
+    // Set the pin
     byte pin = relayPins[relayNumber - 1];
     digitalWrite(pin, RELAY_OFF);
-    buzzer.beep(1);
-    storage.updateJSON("relay.json", relayKey, "off");
     Serial.println("Relay" + String(relayNumber) + " turned OFF");
 }
 
-void Relay::toggle(byte relayNumber)
-{
+void Relay::toggle(byte relayNumber) {
     String relayKey = "relay" + String(relayNumber);
-    if (relayNumber < 1 || relayNumber > 4)
-    {
+    if (relayNumber < 1 || relayNumber > 4) {
         Serial.println("Invalid relay number");
         buzzer.beep(2);
         return;
     }
-    String currentState = getRelayState(relayNumber);
+
+    // Read existing JSON
+    String jsonContent = storage.readJSON("relay.json");
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, jsonContent);
+    if (error) {
+        Serial.println("Failed to parse JSON");
+        return;
+    }
+
+    // Get current state and toggle it
+    String currentState = doc[relayKey]["state"] | "off";
     String newState = (currentState == "on") ? "off" : "on";
+    
+    // Update state in nested structure
+    doc[relayKey]["state"] = newState;
+    // Keep existing duration value
+    if (!doc[relayKey]["duration"].is<int>()) {
+        doc[relayKey]["duration"] = 1000; // Default duration if not set
+    }
+
+    // Convert to string and save
+    String updatedJson;
+    serializeJsonPretty(doc, updatedJson);
+    storage.writeJSON("relay.json", updatedJson);
+
+    // Set the pin
     byte pin = relayPins[relayNumber - 1];
     digitalWrite(pin, (newState == "on") ? RELAY_ON : RELAY_OFF);
-    buzzer.beep(1);
-    storage.updateJSON("relay.json", relayKey, newState);
+    Serial.println("Relay" + String(relayNumber) + " toggled to " + newState);
+}
+
+void Relay::onWithDuration(byte relayNumber, unsigned long duration) {
+    if (relayNumber < 1 || relayNumber > 4) {
+        Serial.println("Invalid relay number");
+        buzzer.beep(2);
+        return;
+    }
+    
+    // Turn on the relay
+    byte pin = relayPins[relayNumber - 1];
+    digitalWrite(pin, RELAY_ON);
+    
+    // Add timer
+    RelayTimer timer = {
+        .relayNumber = relayNumber,
+        .startTime = millis(),
+        .duration = duration
+    };
+    activeTimers.push_back(timer);
+    
+    Serial.println("Relay" + String(relayNumber) + " turned ON for " + String(duration) + "ms");
+}
+
+void Relay::update() {
+    unsigned long currentTime = millis();
+    
+    for (auto it = activeTimers.begin(); it != activeTimers.end();) {
+        if (currentTime - it->startTime >= it->duration) {
+            // Turn off the relay
+            off(it->relayNumber);
+            Serial.println("Relay" + String(it->relayNumber) + " duration completed");
+            it = activeTimers.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }

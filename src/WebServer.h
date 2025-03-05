@@ -5,10 +5,8 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
-
 #include <LittleFS.h>
 #include "Storage.h"
-
 
 class Webserver
 {
@@ -17,6 +15,7 @@ public:
 
 private:
     void setupServerRoutes();
+    void handleChunkedJsonRequest(AsyncWebServerRequest *request, const String &filename);
 };
 
 #endif

@@ -1,11 +1,11 @@
 #include <ESP8266WiFi.h>
-#include "WifiManager.h"
+#include "WifiSettings.h"
 #include "Config.h"
 
 
-WifiManager wifiManager;
+WifiSettings wifiSettings;
 
-void WifiManager::init(){
+void WifiSettings::init(){
     Serial.print("Connecting to ");
     Serial.println(WIFI_SSID);
 

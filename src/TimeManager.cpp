@@ -89,7 +89,7 @@ String TimeManager::getTimeJson() {
 
     // Mengonversi objek JSON ke string
     String output;
-    serializeJson(doc, output);
+    serializeJsonPretty(doc, output);
 
     return output;
 }
